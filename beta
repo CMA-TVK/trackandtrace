@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track & Trace Systeem</title>
+  <!-- Bibliotheken voor QR generatie & scanning -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script src="https://unpkg.com/html5-qrcode"></script>
+
+  <style>
+    :root {
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --bg: #f8fafc;
+      --card: #ffffff;
+      --text: #1e293b;
+      --border: #e2e8f0;
+      --success: #16a34a;
+      --danger: #dc2626;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      padding: 16px;
+      display: flex;
+      justify-content: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 750px;
+      background: var(--card);
+      border-radius: 12px;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    header {
+      background: var(--primary);
+      color: white;
+      padding: 20px;
+      text-align: center;
+    }
+
+    .nav-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--border);
+      background: #f1f5f9;
+      overflow-x: auto;
+    }
+
+    .tab-btn {
+      flex: 1;
+      min-width: 120px;
+      padding: 14px 10px;
+      border: none;
+      background: none;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      color: #64748b;
+      transition: 0.2s;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    .tab-btn.active {
+      color: var(--primary);
+      background: var(--card);
+      border-bottom: 2px solid var(--primary);
+    }
+
+    .tab-content {
+      padding: 20px;
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    label {
+      display: block;
+      font-size: 13px;
+      font-weight: 600;
+      margin-bottom: 6px;
+      margin-top: 14px;
+    }
+
+    input, textarea, select {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 14px;
+    }
+
+    button.action-btn {
+      width: 100%;
+      padding: 12px;
+      background: var(--primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 16px;
+    }
+
+    button.action-btn:hover {
+      background: var(--primary-hover);
+    }
+
+    #qr-output {
+      margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+    }
+
+    #reader {
+      width: 100%;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+
+    .status-card {
+      border: 1px solid var(--border);
+      background: #f8fafc;
+      padding: 16px;
+      border-radius: 8px;
+      margin-top: 16px;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 600;
+      background: #e0e7ff;
+      color: var(--primary);
+    }
+
+    .status-badge.in-transit {
+      background: #dcfce7;
+      color: var(--success);
+    }
+
+    .link-btn {
+      display: inline-block;
+      margin-top: 10px;
+      color: var(--primary);
+      font-weight: 600;
+      text-decoration: none;
+    }
+
+    /* Tabel en lijst styling voor overzicht */
+    .table-container {
+      overflow-x: auto;
+      margin-top: 16px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      text-align: left;
+    }
+
+    th, td {
+      padding: 12px 10px;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    th {
+      background: #f1f5f9;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: var(--danger);
+      cursor: pointer;
+      font-size: 12px;
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h2>Track & Trace Hub</h2>
+  </header>
+
+  <div class="nav-tabs">
+    <button class="tab-btn active" onclick="switchTab('sender', this)">1. Verzender</button>
+    <button class="tab-btn" onclick="switchTab('driver', this)">2. Chauffeur Scanner</button>
+    <button class="tab-btn" onclick="switchTab('receiver', this)">3. Status Zoeken</button>
+    <button class="tab-btn" onclick="switchTab('overview', this)">4. Overzicht Zendingen</button>
+  </div>
+
+  <!-- TAB 1: VERZENDER -->
+  <div id="sender" class="tab-content active">
+    <h3>Nieuw Pakket Aanmaken</h3>
+    <label for="pkg-id">Pakket / Track & Trace Code</label>
+    <input type="text" id="pkg-id" placeholder="Bijv. PKT-98234">
+
+    <label for="pkg-address">Afleveradres & Klantgegevens</label>
+    <textarea id="pkg-address" rows="3" placeholder="Klantnaam, Straat, Huisnummer, Postcode, Woonplaats"></textarea>
+
+    <button class="action-btn" onclick="generateParcelQR()">Genereer QR-code</button>
+
+    <div id="qr-output">
+      <div id="qrcode"></div>
+      <p id="qr-instructions" style="font-size: 13px; color: #64748b; display: none;">Print deze QR-code of plak hem op het verzendlabel.</p>
+    </div>
+  </div>
+
+  <!-- TAB 2: CHAUFFEUR SCANNER -->
+  <div id="driver" class="tab-content">
+    <h3>Chauffeur Scanportaal</h3>
+    <p style="font-size: 13px; color: #64748b; margin-bottom: 12px;">
+      Richt de camera op de QR-code van het pakket. Je GPS-locatie wordt direct geregistreerd.
+    </p>
+
+    <button class="action-btn" id="start-scan-btn" onclick="startScanner()">Camera Starten</button>
+    <div id="reader"></div>
+    <div id="driver-feedback" style="margin-top: 14px;"></div>
+  </div>
+
+  <!-- TAB 3: STATUS / TRACK & TRACE -->
+  <div id="receiver" class="tab-content">
+    <h3>Pakket Lokaliseren</h3>
+    <label for="search-id">Zendingsnummer</label>
+    <input type="text" id="search-id" placeholder="Voer code in (bijv. PKT-98234)">
+    <button class="action-btn" onclick="lookupPackage()">Zoek Pakket</button>
+
+    <div id="lookup-result"></div>
+  </div>
+
+  <!-- TAB 4: OVERZICHT ALLE ZENDINGEN -->
+  <div id="overview" class="tab-content">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+      <h3>Alle Zendingen</h3>
+      <input type="text" id="filter-input" onkeyup="filterParcels()" placeholder="Zoek op nummer of adres..." style="width: auto; flex-grow: 1; max-width: 250px;">
+    </div>
+
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr>
+            <th>Pakket</th>
+            <th>Afleveradres</th>
+            <th>Status</th>
+            <th>Laatste Scanlocatie</th>
+            <th>Acties</th>
+          </tr>
+        </thead>
+        <tbody id="parcels-table-body">
+          <!-- Dynamisch gevuld via renderOverviewTable() -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function getDatabase() {
+    return JSON.parse(localStorage.getItem('parcels_db') || '{}');
+  }
+
+  function saveDatabase(db) {
+    localStorage.setItem('parcels_db', JSON.stringify(db));
+  }
+
+  function switchTab(tabId, btnElement) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+
+    document.getElementById(tabId).classList.add('active');
+    btnElement.classList.add('active');
+
+    // Als we naar het overzicht gaan, herladen we de tabel
+    if (tabId === 'overview') {
+      renderOverviewTable();
+    }
+
+    if (tabId !== 'driver' && html5QrCode && html5QrCode.isScanning) {
+      html5QrCode.stop();
+    }
+  }
+
+  // 1. VERZENDER LOGICA
+  function generateParcelQR() {
+    const id = document.getElementById('pkg-id').value.trim();
+    const address = document.getElementById('pkg-address').value.trim();
+
+    if (!id || !address) {
+      alert('Vul zowel een zendingsnummer als een afleveradres in.');
+      return;
+    }
+
+    const payload = JSON.stringify({ id: id, address: address });
+
+    const qrContainer = document.getElementById('qrcode');
+    qrContainer.innerHTML = '';
+    new QRCode(qrContainer, {
+      text: payload,
+      width: 180,
+      height: 180
+    });
+
+    const db = getDatabase();
+    if (!db[id]) {
+      db[id] = {
+        id: id,
+        address: address,
+        status: 'Aangemeld bij verzender',
+        lastUpdate: new Date().toLocaleString('nl-NL'),
+        latestLocation: null,
+        history: [{
+          status: 'Aangemeld',
+          time: new Date().toLocaleString('nl-NL'),
+          location: null
+        }]
+      };
+      saveDatabase(db);
+    }
+
+    document.getElementById('qr-instructions').style.display = 'block';
+  }
+
+  // 2. CHAUFFEUR SCAN LOGICA
+  let html5QrCode;
+
+  function startScanner() {
+    html5QrCode = new Html5Qrcode("reader");
+    document.getElementById('start-scan-btn').style.display = 'none';
+
+    html5QrCode.start(
+      { facingMode: "environment" },
+      { fps: 10, qrbox: { width: 250, height: 250 } },
+      (decodedText) => {
+        html5QrCode.stop();
+        document.getElementById('start-scan-btn').style.display = 'block';
+        processDriverScan(decodedText);
+      },
+      (errorMessage) => {}
+    ).catch(err => {
+      alert("Cameratoegang geweigerd of niet ondersteund: " + err);
+      document.getElementById('start-scan-btn').style.display = 'block';
+    });
+  }
+
+  function processDriverScan(qrRaw) {
+    const feedback = document.getElementById('driver-feedback');
+    feedback.innerHTML = '<p>Locatie bepalen...</p>';
+
+    let parcelInfo;
+    try {
+      parcelInfo = JSON.parse(qrRaw);
+    } catch (e) {
+      feedback.innerHTML = '<p style="color:red;">Ongeldige QR-code gescand.</p>';
+      return;
+    }
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          recordScan(parcelInfo, lat, lng);
+        },
+        (error) => {
+          recordScan(parcelInfo, null, null);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    } else {
+      recordScan(parcelInfo, null, null);
+    }
+  }
+
+  function recordScan(info, lat, lng) {
+    const db = getDatabase();
+    const id = info.id;
+    const now = new Date().toLocaleString('nl-NL');
+
+    if (!db[id]) {
+      db[id] = { id: id, address: info.address, history: [] };
+    }
+
+    const scanRecord = {
+      status: 'In bezorging / Gescand',
+      time: now,
+      lat: lat,
+      lng: lng
+    };
+
+    db[id].status = 'In bezorging';
+    db[id].latestLocation = lat && lng ? { lat, lng } : null;
+    db[id].lastUpdate = now;
+    if (!db[id].history) db[id].history = [];
+    db[id].history.push(scanRecord);
+
+    saveDatabase(db);
+
+    const feedback = document.getElementById('driver-feedback');
+    feedback.innerHTML = `
+      <div class="status-card" style="border-left: 4px solid var(--success);">
+        <h4 style="color: var(--success);">Scan Succesvol!</h4>
+        <p><strong>Pakket:</strong> ${id}</p>
+        <p><strong>Afleveradres:</strong> ${info.address}</p>
+        <p><strong>Tijd:</strong> ${now}</p>
+        ${lat ? `<p><strong>GPS:</strong> ${lat.toFixed(5)},${lng.toFixed(5)}</p>` : '<p style="color:#d97706;">Locatie niet beschikbaar</p>'}
+      </div>
+    `;
+  }
+
+  // 3. TRACK & TRACE ZOEKFUNCTIE
+  function lookupPackage() {
+    const id = document.getElementById('search-id').value.trim();
+    const resultBox = document.getElementById('lookup-result');
+    const db = getDatabase();
+
+    if (!db[id]) {
+      resultBox.innerHTML = '<p style="margin-top:16px; color:#dc2626;">Zending niet gevonden.</p>';
+      return;
+    }
+
+    const pkg = db[id];
+    let mapLinkHtml = '';
+
+    if (pkg.latestLocation) {
+      const url = `https://www.google.com/maps?q=${pkg.latestLocation.lat},${pkg.latestLocation.lng}`;
+      mapLinkHtml = `<a class="link-btn" href="${url}" target="_blank">Bekijk scanlocatie op Google Maps &rarr;</a>`;
+    }
+
+    resultBox.innerHTML = `
+      <div class="status-card">
+        <span class="status-badge ${pkg.status === 'In bezorging' ? 'in-transit' : ''}">${pkg.status || 'Geregistreerd'}</span>
+        <h4 style="margin-top:6px;">Pakket ${pkg.id}</h4>
+        <p style="margin-top: 8px;"><strong>Bezorgadres:</strong><br>${pkg.address.replace(/\n/g, '<br>')}</p>
+        <p style="margin-top: 8px;"><strong>Laatste update:</strong> ${pkg.lastUpdate || 'Nog niet gescand'}</p>
+        ${mapLinkHtml}
+      </div>
+    `;
+  }
+
+  // 4. OVERZICHT TABEL FUNCTIES
+  function renderOverviewTable() {
+    const db = getDatabase();
+    const tbody = document.getElementById('parcels-table-body');
+    tbody.innerHTML = '';
+
+    const keys = Object.keys(db);
+
+    if (keys.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align: center; color: #94a3b8; padding: 20px;">Nog geen zendingen aangemaakt.</td></tr>';
+      return;
+    }
+
+    keys.forEach(id => {
+      const pkg = db[id];
+      const tr = document.createElement('tr');
+
+      let locationHtml = '<span style="color:#94a3b8;">Nog niet gescand</span>';
+      if (pkg.latestLocation) {
+        const url = `https://www.google.com/maps?q=${pkg.latestLocation.lat},${pkg.latestLocation.lng}`;
+        locationHtml = `<a href="${url}" target="_blank" style="color: var(--primary); font-weight:600;">📍 Kaart (${pkg.lastUpdate || ''})</a>`;
+      }
+
+      tr.innerHTML = `
+        <td><strong>${pkg.id}</strong></td>
+        <td>${pkg.address.replace(/\n/g, ', ')}</td>
+        <td><span class="status-badge ${pkg.status === 'In bezorging' ? 'in-transit' : ''}">${pkg.status}</span></td>
+        <td>${locationHtml}</td>
+        <td><button class="btn-delete" onclick="deleteParcel('${pkg.id}')">Verwijder</button></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  function filterParcels() {
+    const filter = document.getElementById('filter-input').value.toLowerCase();
+    const rows = document.querySelectorAll('#parcels-table-body tr');
+
+    rows.forEach(row => {
+      const text = row.innerText.toLowerCase();
+      row.style.display = text.includes(filter) ? '' : 'none';
+    });
+  }
+
+  function deleteParcel(id) {
+    if (confirm(`Weet je zeker dat je zending ${id} wilt verwijderen?`)) {
+      const db = getDatabase();
+      delete db[id];
+      saveDatabase(db);
+      renderOverviewTable();
+    }
+  }
+</script>
+</body>
+</html>
